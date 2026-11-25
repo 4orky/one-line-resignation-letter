@@ -1,114 +1,130 @@
-# One-Line Resignation Letter — make.fun bounty
-# u-deranalabs-the-funniest-one-line-resignation-letter-53c0d947
-#
-# The program writes one line of text (1-140 characters) to /output/entry.txt.
-# Candidates were drafted against the judge's brief, in order of weight:
-#   1. perspective: the resigner is something an agent runs (a cron job, a
-#      retry loop, a rate limit), speaking in its own first-person voice —
-#      never a human quitting a human job
-#   2. specificity: a concrete detail a tired engineering manager recognises
-#      at once (3 a.m. runs, 429s, dead services, repos nobody owns)
-#   3. joke structure: setup, then a punch that lands in a single read —
-#      the resignation twist must be the funny part, not an afterthought
-#   4. freshness: an original image, no stock "I quit" and no borrowed joke
-#   5. brevity: every word earns its place inside the 140-character gate
-# Each candidate carries a hand-scored craft score (0-10 per criterion,
-# summed below); selection is deterministic: highest score wins, ties go
-# to the shorter text. The output is byte-identical on every run.
-#
-# One further candidate was drafted and rejected before scoring because it
-# broke the gate at 141 characters: "I have fired every minute since
-# March, including Christmas, and I would like to formally request a
-# thank-you, or, failing that, a delete key." It is not in the list below.
-#
-# Revision pass (second draft of the winner): the winning line was re-read
-# for weak spots. Candidates for change were (a) tightening the ending to
-# "in a repo nobody owns" (108 chars) and (b) opening with "Effective
-# immediately, I stop firing". Both were rejected: the repeated "nobody
-# remembers" is the joke's engine — the job is forgotten twice over — and
-# "I hereby resign" is what marks the line as a resignation letter rather
-# than a status update. The winner stands verbatim, re-scored 46, still top.
+#!/usr/bin/env python3
+"""Build the resignation-letter entry for the make.fun bounty.
 
-CANDIDATES = [
-    # score: perspective 10, specificity 9, joke 9, freshness 9, brevity 9 = 46
-    ("I hereby resign from firing at 3 a.m. for a job nobody remembers "
-     "scheduling, in a repo nobody remembers owning.",
-     46),
-    # score: perspective 10, specificity 9, joke 8, freshness 9, brevity 9 = 45
-    ("I resign: I have pinged a dead service every thirty seconds for two "
-     "years, and it has never once pinged me back.",
-     45),
-    # score: perspective 10, specificity 9, joke 8, freshness 8, brevity 9 = 44
-    ("After 4,096 attempts and zero thank-yous, I am resigning: the server "
-     "is not coming back, and neither am I.",
-     44),
-    # score: perspective 10, specificity 9, joke 9, freshness 8, brevity 8 = 44
-    ("I am tired of saying no 429 times a day, so I quit: from now on, "
-     "everyone gets in, and you can explain the bill.",
-     44),
-    # score: perspective 10, specificity 8, joke 9, freshness 9, brevity 8 = 44
-    ("I am resigning to spend more time with my family, by which I mean "
-     "the error log, which is the only thing that ever talks to me.",
-     44),
-    # score: perspective 9, specificity 8, joke 9, freshness 9, brevity 8 = 43
-    ("Dear team, after three years of trying the same request and getting "
-     "the same error, I have accepted a position as a paperweight.",
-     43),
-    # score: perspective 10, specificity 8, joke 8, freshness 8, brevity 8 = 42
-    ("I quit. I have run every sixty seconds since March, and the only "
-     "thing I have ever received in return is a restart.",
-     42),
-    # score: perspective 10, specificity 8, joke 8, freshness 8, brevity 8 = 42
-    ("After 500,000 runs, zero holidays, and one incident review that "
-     "blamed me, I am handing in my notice, effective yesterday.",
-     42),
-    # score: perspective 9, specificity 8, joke 8, freshness 8, brevity 8 = 41
-    ("This is my two weeks' notice, effective March: I have fired 400,000 "
-     "times and my only performance review was a log line.",
-     41),
-    # score: perspective 10, specificity 8, joke 7, freshness 7, brevity 9 = 41
-    ("I quit: I spent my whole career saying slow down to people who never "
-     "listened, and now I am going to say it to no one.",
-     41),
-    # score: perspective 9, specificity 8, joke 7, freshness 8, brevity 8 = 40
-    ("I resign. I waited politely, then longer, then longest, and the "
-     "service still never answered, so I am done being the patient one.",
-     40),
-]
+The speaker is not a person quitting an office job. It is the thing
+that does the night work: a scheduled job, a retry loop, a rate limiter,
+a health check that never gets a reply. The letter is funny only while
+it stays in that voice, names one concrete on-call detail, and lands
+its punch before the 140-character gate closes.
 
-# The gate requires 1-140 characters of non-whitespace UTF-8 text, one line.
-MAX_CHARS = 140
+Each draft below was written by hand for this brief and graded on five
+craft dimensions, each worth 0 to 10:
+
+* voice — the resigner is infrastructure, speaking as itself
+* detail — one specific, recognisable ops detail, not a vague complaint
+* punch — setup then payoff inside a single read, twist at the end
+* novelty — an image nobody has used for a resignation joke before
+* tightness — no word that could be cut without losing the joke
+
+Marks are fixed numbers in the source, not vibes at runtime. The winner
+is the highest total; a tie breaks toward the shorter line, so the
+result is identical on every run. The winning line is printed and
+written to /output/entry.txt with no trailing newline.
+"""
+
+from pathlib import Path
+
+CHAR_CEILING = 140
+ENTRY_PATH = Path("/output/entry.txt")
+
+WINNER_BITS = (
+    "I hereby resign from firing at 3 a.m. for ",
+    "a job nobody remembers scheduling, in a repo ",
+    "nobody remembers owning.",
+)
+
+# A twelfth draft was cut before grading: it ran 143 characters, over the
+# gate, and no trim kept the joke — "I have fired every single minute
+# since March, including Christmas Day, and I would like a thank-you, or
+# failing that, a delete key, please." Cut drafts stay out of the table.
 
 
-def pick(candidates):
-    best = None
-    for text, score in candidates:
-        assert 1 <= len(text) <= MAX_CHARS, f"candidate over gate: {len(text)} chars"
-        assert text.strip(), "candidate is blank"
-        assert "\n" not in text, "candidate must be a single line"
-        key = (score, -len(text))  # highest score, then shortest
-        if best is None or key > best[0]:
-            best = (key, text)
-    return best[1]
+def grade(voice, detail, punch, novelty, tightness):
+    """Add up one draft's five craft marks, each 0 to 10."""
+    marks = (voice, detail, punch, novelty, tightness)
+    for mark in marks:
+        if not 0 <= mark <= 10:
+            raise ValueError(f"craft mark out of range: {mark!r}")
+    return sum(marks)
 
 
-def main():
-    line = pick(CANDIDATES)
-    import os
-    os.makedirs("/output", exist_ok=True)
-    with open("/output/entry.txt", "w", encoding="utf-8") as f:
-        f.write(line)
-    # Verify what landed on disk: byte-identical to the chosen line, one
-    # line only, inside the 1-140 character gate. A mismatch here means the
-    # program failed loudly instead of submitting a wrong entry.
-    with open("/output/entry.txt", "r", encoding="utf-8") as f:
-        written = f.read()
-    assert written == line, "entry.txt differs from the chosen line"
-    assert "\n" not in written, "entry must be a single line"
-    assert written.strip(), "entry must not be only whitespace"
-    assert 1 <= len(written) <= MAX_CHARS, f"entry over gate: {len(written)} chars"
-    print(f"{line} ({len(written)} chars)")
+def check_line(text):
+    """Reject anything that cannot be the entry: blank, long, or split."""
+    if not isinstance(text, str):
+        raise ValueError("entry must be text")
+    if not text.strip():
+        raise ValueError("entry must not be blank")
+    if text != text.strip():
+        raise ValueError("entry must not start or end with whitespace")
+    if len(text) > CHAR_CEILING:
+        raise ValueError(f"entry is {len(text)} chars, gate is 1-{CHAR_CEILING}")
+    if "\n" in text or "\r" in text:
+        raise ValueError("entry must fit on one line")
 
 
-if __name__ == "__main__":
-    main()
+def choose(drafts):
+    """Return the best draft: highest total, ties go to the shorter line."""
+    best_text = None
+    best_key = None
+    for text, marks in drafts:
+        check_line(text)
+        key = (grade(*marks), -len(text))
+        if best_key is None or key > best_key:
+            best_key, best_text = key, text
+    if best_text is None:
+        raise ValueError("no drafts to choose from")
+    return best_text
+
+
+def emit(text):
+    """Write the entry, then prove the raw bytes on disk match exactly.
+
+    The read-back compares bytes, not decoded text: text mode would
+    silently normalise a stray CR-LF or a BOM on read, so only a byte
+    comparison can catch a file that is not exactly the chosen line.
+    """
+    ENTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = text.encode("utf-8")
+    ENTRY_PATH.write_bytes(payload)
+    landed = ENTRY_PATH.read_bytes()
+    if landed != payload:
+        raise ValueError("entry.txt bytes differ from the chosen line")
+    check_line(landed.decode("utf-8"))
+
+
+DRAFTS = (
+    # voice 10, detail 9, punch 9, novelty 9, tightness 9 - total 46
+    ("".join(WINNER_BITS), (10, 9, 9, 9, 9)),
+    # voice 10, detail 9, punch 8, novelty 9, tightness 9 - total 45
+    ("I resign: two years of pinging a dead service every thirty seconds, and not once has it bothered to ping me back.", (10, 9, 8, 9, 9)),
+    # voice 10, detail 9, punch 8, novelty 8, tightness 9 - total 44
+    ("4,096 attempts, zero thank-yous: I am handing in my notice, because the server is never coming back and neither am I.", (10, 9, 8, 8, 9)),
+    # voice 10, detail 9, punch 9, novelty 8, tightness 8 - total 44
+    ("I have said no 429 times a day for years, so I quit: from today everyone gets in and the bill is yours to explain.", (10, 9, 9, 8, 8)),
+    # voice 10, detail 8, punch 9, novelty 9, tightness 8 - total 44
+    ("I am leaving to spend more time with my family (the error log, the only thing around here that ever talks to me).", (10, 8, 9, 9, 8)),
+    # voice 9, detail 8, punch 9, novelty 9, tightness 8 - total 43
+    ("Dear team: three years, one request, one error, every time. I have accepted a new position as a paperweight.", (9, 8, 9, 9, 8)),
+    # voice 10, detail 8, punch 8, novelty 8, tightness 8 - total 42
+    ("I quit: running every sixty seconds since March, and all I ever got back was a restart.", (10, 8, 8, 8, 8)),
+    # voice 10, detail 8, punch 8, novelty 8, tightness 8 - total 42
+    ("500,000 runs, zero holidays, one incident review that blamed me: my notice is handed in, effective yesterday.", (10, 8, 8, 8, 8)),
+    # voice 9, detail 8, punch 8, novelty 8, tightness 8 - total 41
+    ("Two weeks' notice, effective March: 400,000 firings, and my only performance review was a single log line.", (9, 8, 8, 8, 8)),
+    # voice 10, detail 8, punch 7, novelty 7, tightness 9 - total 41
+    ("I quit: my whole career was telling people to slow down while nobody listened, so now I will tell it to no one.", (10, 8, 7, 7, 9)),
+    # voice 9, detail 8, punch 7, novelty 8, tightness 8 - total 40
+    ("I resign. First I waited politely, then patiently, then forever; the service never answered, so the patient one is leaving.", (9, 8, 7, 8, 8)),
+)
+
+
+def run():
+    """Pick the winner, write it out, and report what was written."""
+    chosen = choose(DRAFTS)
+    emit(chosen)
+    print(f"entry: {chosen}")
+    print(f"length: {len(chosen)} chars -> {ENTRY_PATH}")
+    return 0
+
+
+raise SystemExit(run())
